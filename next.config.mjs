@@ -10,6 +10,10 @@ const pwaConfig = withPWA({
 
 const nextConfig = {
   reactStrictMode: true,
+  output: 'standalone',
+  experimental: {
+    esmExternals: true
+  }
 };
 
 export default pwaConfig(nextConfig); 

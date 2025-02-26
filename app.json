@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "AI Mentor",
+    "slug": "ai-mentor-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.aimentor"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.yourcompany.aimentor"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "name": "AI Mentor",
+      "shortName": "AI Mentor",
+      "description": "Your personal AI mentor to help you achieve your goals",
+      "lang": "en-US",
+      "themeColor": "#007AFF",
+      "backgroundColor": "#ffffff",
+      "scope": "/",
+      "startUrl": ".",
+      "display": "standalone",
+      "orientation": "portrait",
+      "crossorigin": "use-credentials"
+    }
+  }
+}

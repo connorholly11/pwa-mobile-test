@@ -8,11 +8,17 @@ export interface Message {
   text: string;
   sender: 'user' | 'ai';
   timestamp: string;
+  reasoning?: string;
   tokenUsage?: {
     promptTokens: number;
     completionTokens: number;
-    totalTokens: number;
+    totalCost: number;
+    pricingType?: string;
   };
+  isError?: boolean; // Flag to identify error messages
+  audioData?: string; // Base64 encoded audio data
+  isAudioLoading?: boolean; // Flag to indicate audio is being generated
+  audioError?: string; // Error message if audio generation fails
 }
 
 interface ChatContextType {
@@ -25,14 +31,22 @@ interface ChatContextType {
   lastTokenUsage: {
     promptTokens: number;
     completionTokens: number;
-    totalTokens: number;
+    totalCost: number;
+    pricingType?: string;
   } | null;
+  showReasoning: boolean;
+  toggleReasoning: () => void;
+  apiErrorMessage: string | null; // Track the current API error
+  generateAudioForMessage: (messageId: string) => Promise<void>; // New function to generate audio
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 // Initial system message to set the AI's behavior
-const SYSTEM_MESSAGE = "You are a friendly and helpful AI assistant. Keep your responses concise and engaging. You're chatting in a mobile app interface.";
+const SYSTEM_MESSAGE = "You are a wise old man, but don't disguise yourself as a human. you are calm, but direct. You want to help people explore humankind and themselves. Speak wisely, but noramlly. You aren't trying to sound special.";
+
+// Import the textToSpeech function
+import { textToSpeech } from '../utils/humeApi';
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -41,8 +55,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [lastTokenUsage, setLastTokenUsage] = useState<{
     promptTokens: number;
     completionTokens: number;
-    totalTokens: number;
+    totalCost: number;
+    pricingType?: string;
   } | null>(null);
+  const [showReasoning, setShowReasoning] = useState(false);
+  const [apiErrorMessage, setApiErrorMessage] = useState<string | null>(null);
   
   // Load messages from localStorage on mount
   useEffect(() => {
@@ -64,6 +81,54 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     console.log('💾 Saved messages to localStorage, count:', messages.length);
   }, [messages]);
   
+  const toggleReasoning = () => {
+    setShowReasoning(prev => !prev);
+  };
+  
+  // Function to generate audio for a specific message
+  const generateAudioForMessage = async (messageId: string) => {
+    // Find the message
+    const message = messages.find(m => m.id === messageId);
+    if (!message || message.audioData || message.isAudioLoading) {
+      return; // Already has audio or is loading
+    }
+    
+    // Update the message to indicate audio is loading
+    setMessages(prevMessages => 
+      prevMessages.map(m => 
+        m.id === messageId ? { ...m, isAudioLoading: true } : m
+      )
+    );
+    
+    try {
+      // Call the Hume API to convert text to speech
+      const audioData = await textToSpeech(message.text);
+      
+      // Update the message with the audio data
+      setMessages(prevMessages => 
+        prevMessages.map(m => 
+          m.id === messageId ? { ...m, audioData, isAudioLoading: false } : m
+        )
+      );
+      
+      console.log('🎵 Added audio data to message:', messageId);
+    } catch (error) {
+      // Handle error
+      console.error('❌ Error generating audio for message:', error);
+      
+      // Update message with error
+      setMessages(prevMessages => 
+        prevMessages.map(m => 
+          m.id === messageId ? { 
+            ...m, 
+            isAudioLoading: false, 
+            audioError: error instanceof Error ? error.message : 'Unknown error generating audio' 
+          } : m
+        )
+      );
+    }
+  };
+  
   const addMessage = async (text: string, sender: 'user' | 'ai') => {
     console.log(`📝 Adding ${sender} message: "${text}"`);
     
@@ -79,6 +144,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // If this is a user message, get response from DeepSeek API
     if (sender === 'user') {
       setIsLoading(true);
+      setApiErrorMessage(null); // Clear any previous errors
       console.log('⏳ Setting loading state to true');
       
       try {
@@ -110,6 +176,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           text: apiResponse.content,
           sender: 'ai',
           timestamp: new Date().toISOString(),
+          reasoning: apiResponse.reasoning,
           tokenUsage: apiResponse.usage,
         };
         
@@ -117,12 +184,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setMessages(prevMessages => [...prevMessages, aiMessage]);
       } catch (error) {
         console.error('❌ Error getting AI response:', error);
-        // Add a fallback error message
+        
+        // Set the API error message for display in the UI
+        if (error instanceof Error) {
+          setApiErrorMessage(error.message);
+        } else {
+          setApiErrorMessage('Unknown error occurred');
+        }
+        
+        // Add a error message
         const errorMessage: Message = {
           id: Date.now().toString(),
-          text: "Sorry, I'm having trouble connecting. Please try again later.",
+          text: error instanceof Error ? error.message : 'An error occurred when connecting to the AI service.',
           sender: 'ai',
           timestamp: new Date().toISOString(),
+          isError: true
         };
         console.log('⚠️ Adding error message to conversation');
         setMessages(prevMessages => [...prevMessages, errorMessage]);
@@ -137,6 +213,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     console.log('🧹 Clearing chat history');
     setMessages([]);
     setLastTokenUsage(null);
+    setApiErrorMessage(null);
   };
   
   return (
@@ -148,7 +225,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         activeTab, 
         setActiveTab,
         isLoading,
-        lastTokenUsage
+        lastTokenUsage,
+        showReasoning,
+        toggleReasoning,
+        apiErrorMessage,
+        generateAudioForMessage
       }}
     >
       {children}

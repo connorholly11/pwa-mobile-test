@@ -2,45 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useChat } from '../contexts/ChatContext';
+import { 
+  SpeechRecognitionWithAlternatives,
+  SpeechRecognitionEvent,
+  SpeechRecognitionErrorEvent
+} from '../types/speech-recognition';
 
-// Interface for SpeechRecognition events
-interface SpeechRecognitionEvent extends Event {
-  results: {
-    [index: number]: {
-      [index: number]: {
-        transcript: string;
-        confidence: number;
-      };
-    };
-  };
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-  message: string;
-}
-
-// Interface for Web Speech API's SpeechRecognition
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  maxAlternatives: number; // Added for better results
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onresult: (event: SpeechRecognitionEvent) => void;
-  onerror: (event: SpeechRecognitionErrorEvent) => void;
-  onend: () => void;
-}
-
-// Declare the global types for TypeScript
-declare global {
-  interface Window {
-    SpeechRecognition?: new () => SpeechRecognition;
-    webkitSpeechRecognition?: new () => SpeechRecognition;
-  }
-}
+// Use the extended type with maxAlternatives property
+type SpeechRecognition = SpeechRecognitionWithAlternatives;
 
 // Create browser compatible SpeechRecognition object
 const SpeechRecognitionAPI = typeof window !== 'undefined' ? 
@@ -75,101 +44,120 @@ export default function ChatInput() {
     let recognitionInstance: SpeechRecognition | null = null;
     
     if (SpeechRecognitionAPI) {
-      recognitionInstance = new SpeechRecognitionAPI();
-      recognitionInstance.continuous = false;
-      recognitionInstance.interimResults = false;
-      recognitionInstance.maxAlternatives = 3; // Get up to 3 alternative transcriptions
-      recognitionInstance.lang = 'en-US';
-      
-      recognitionInstance.onresult = (event) => {
-        // Reset failed attempts on successful recognition
-        setFailedAttempts(0);
+      try {
+        // Cast to ensure TypeScript recognizes the extended interface
+        const instance = new SpeechRecognitionAPI() as SpeechRecognition;
         
-        // Get the most confident transcript
-        const transcript = event.results[0][0].transcript;
-        const confidence = event.results[0][0].confidence;
+        // Set the required properties
+        instance.continuous = false;
+        instance.interimResults = false;
+        instance.maxAlternatives = 3; // Get up to 3 alternative transcriptions
+        instance.lang = 'en-US';
         
-        console.log('🎙️ Speech recognized:', transcript, 'Confidence:', confidence);
-        setMessage(transcript);
-        setIsListening(false);
-        setErrorMessage(null);
+        // Assign the instance to our local variable
+        recognitionInstance = instance;
         
-        // Auto-submit the recognized speech after a short delay
-        setTimeout(() => {
-          if (isMountedRef.current && transcript.trim()) {
-            addMessage(transcript, 'user');
-            setMessage('');
-          }
-        }, 500); // Small delay to let the user see what was recognized
-      };
-      
-      recognitionInstance.onerror = (event) => {
-        console.error('🎙️ Speech recognition error:', event.error, event.message);
-        
-        // Increment failed attempts for network errors
-        if (event.error === 'network') {
-          setFailedAttempts(prev => prev + 1);
-        }
-        
-        setIsListening(false);
-        
-        // Show appropriate error message based on the error type
-        if (event.error === 'network') {
-          if (failedAttempts >= maxRetries) {
-            setErrorMessage('Speech recognition unavailable. Please type your message instead or try again later.');
-          } else {
-            setErrorMessage(`Network issue with speech recognition. Retry ${failedAttempts + 1}/${maxRetries + 1}`);
+        recognitionInstance.onresult = (event) => {
+          // Reset failed attempts on successful recognition
+          setFailedAttempts(0);
+          
+          // Get the most confident transcript with proper type handling
+          if (event.results && event.results[0] && event.results[0][0]) {
+            // Type assertion to extract the properties safely
+            const result = event.results[0][0] as unknown as { transcript: string; confidence: number };
+            const transcript = result.transcript;
+            const confidence = result.confidence;
             
-            // Auto-retry after a delay
-            setTimeout(() => {
-              if (isMountedRef.current && recognition) {
-                setIsListening(true);
-                recognition.start();
-              }
-            }, 1500);
-          }
-        } else if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-          setErrorMessage('Microphone access denied. Please allow microphone permission in your browser settings.');
-        } else if (event.error === 'no-speech') {
-          setErrorMessage('No speech detected. Please try again and speak clearly.');
-        } else if (event.error === 'aborted') {
-          // Don't show error for user-initiated abort
-          setErrorMessage(null);
-        } else {
-          setErrorMessage(`Speech recognition error: ${event.error}`);
-        }
-        
-        // Clear error message after 5 seconds
-        if (errorTimeoutRef.current) {
-          clearTimeout(errorTimeoutRef.current);
-        }
-        
-        errorTimeoutRef.current = setTimeout(() => {
-          if (isMountedRef.current) {
+            console.log('🎙️ Speech recognized:', transcript, 'Confidence:', confidence);
+            setMessage(transcript);
+            setIsListening(false);
             setErrorMessage(null);
+            
+            // Auto-submit the recognized speech after a short delay
+            setTimeout(() => {
+              if (isMountedRef.current && transcript.trim()) {
+                addMessage(transcript, 'user');
+                setMessage('');
+              }
+            }, 500); // Small delay to let the user see what was recognized
           }
-        }, 5000);
-      };
-      
-      recognitionInstance.onend = () => {
-        if (isMountedRef.current) {
+        };
+        
+        recognitionInstance.onerror = (event) => {
+          console.error('🎙️ Speech recognition error:', event.error, event.message);
+          
+          // Increment failed attempts for network errors
+          if (event.error === 'network') {
+            setFailedAttempts(prev => prev + 1);
+          }
+          
           setIsListening(false);
-        }
-      };
-      
-      setRecognition(recognitionInstance);
+          
+          // Show appropriate error message based on the error type
+          if (event.error === 'network') {
+            if (failedAttempts >= maxRetries) {
+              setErrorMessage('Speech recognition unavailable. Please type your message instead or try again later.');
+            } else {
+              setErrorMessage(`Network issue with speech recognition. Retry ${failedAttempts + 1}/${maxRetries + 1}`);
+              
+              // Auto-retry after a delay
+              setTimeout(() => {
+                if (isMountedRef.current && recognition) {
+                  setIsListening(true);
+                  recognition.start();
+                }
+              }, 1500);
+            }
+          } else if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+            setErrorMessage('Microphone access denied. Please allow microphone permission in your browser settings.');
+          } else if (event.error === 'no-speech') {
+            setErrorMessage('No speech detected. Please try again and speak clearly.');
+          } else if (event.error === 'aborted') {
+            // Don't show error for user-initiated abort
+            setErrorMessage(null);
+          } else {
+            setErrorMessage(`Speech recognition error: ${event.error}`);
+          }
+          
+          // Clear error message after 5 seconds
+          if (errorTimeoutRef.current) {
+            clearTimeout(errorTimeoutRef.current);
+          }
+          
+          errorTimeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              setErrorMessage(null);
+            }
+          }, 5000);
+        };
+        
+        recognitionInstance.onend = () => {
+          if (isMountedRef.current) {
+            setIsListening(false);
+          }
+        };
+        
+        setRecognition(recognitionInstance);
+      } catch (err) {
+        console.error('Failed to initialize speech recognition:', err);
+        setErrorMessage('Speech recognition failed to initialize');
+      }
     }
     
     // Cleanup function that uses the local variable instead of state
     return () => {
       if (recognitionInstance) {
-        recognitionInstance.abort();
+        try {
+          recognitionInstance.abort();
+        } catch (err) {
+          console.error('Error aborting speech recognition:', err);
+        }
       }
       if (errorTimeoutRef.current) {
         clearTimeout(errorTimeoutRef.current);
       }
     };
-  }, [addMessage]); // Only depends on addMessage
+  }, [addMessage, failedAttempts, maxRetries]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

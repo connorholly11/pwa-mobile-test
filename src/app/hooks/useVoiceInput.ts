@@ -1,52 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { 
+  SpeechRecognitionBase, 
+  SpeechRecognitionEvent, 
+  SpeechRecognitionErrorEvent 
+} from '../types/speech-recognition';
 
-// Define types for the Web Speech API
-interface SpeechRecognitionResult {
-  transcript: string;
-  confidence: number;
-  [index: number]: any; // Allow numeric indexing for browser compatibility
-}
-
-interface SpeechRecognitionResultList {
-  [index: number]: SpeechRecognitionResult;
-  length: number;
-}
-
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-  resultIndex: number;
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-  message: string;
-}
-
-// Define proper SpeechRecognition interface that matches browser implementations
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  
-  // Fix event handlers with the correct types
-  onstart: ((ev: Event) => void) | null;
-  onend: ((ev: Event) => void) | null;
-  onerror: ((ev: SpeechRecognitionErrorEvent) => void) | null;
-  onresult: ((ev: SpeechRecognitionEvent) => void) | null;
-}
-
-// Browser-specific type declaration
-declare global {
-  interface Window {
-    SpeechRecognition: new () => SpeechRecognition;
-    webkitSpeechRecognition: new () => SpeechRecognition;
-  }
-}
+// Removing redundant type definitions since we're now importing from shared file
+type SpeechRecognition = SpeechRecognitionBase;
 
 interface UseVoiceInputReturn {
   isListening: boolean;
@@ -98,8 +60,9 @@ export function useVoiceInput(): UseVoiceInputReturn {
           // Safely access transcript if available
           if (event.results && event.results[current]) {
             const result = event.results[current];
-            if (result[0]) {
-              const transcript = result[0].transcript;
+            // Type checking to ensure transcript property exists
+            if (result[0] && typeof result[0] === 'object' && 'transcript' in result[0]) {
+              const transcript = result[0].transcript as string;
               setTranscript(transcript);
             }
           }

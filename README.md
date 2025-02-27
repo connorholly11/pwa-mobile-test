@@ -20,6 +20,47 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Push Notifications
+
+This PWA supports push notifications on both Android and iOS. For iOS devices, push notifications are supported for PWAs starting with iOS 16.4.
+
+### iOS Requirements
+
+For push notifications to work on iOS:
+
+1. The PWA must be added to the home screen (installed)
+2. The device must be running iOS 16.4 or later
+3. The PWA must be installed from Safari (not other browsers)
+4. The user must grant notification permission
+
+### Setup Instructions
+
+1. Generate VAPID keys for Web Push:
+
+```bash
+# Install web-push globally
+npm install -g web-push
+
+# Generate VAPID keys
+web-push generate-vapid-keys
+```
+
+2. Add the keys to your `.env.local` file:
+
+```
+NEXT_PUBLIC_VAPID_KEY=YOUR_PUBLIC_VAPID_KEY
+VAPID_PRIVATE_KEY=YOUR_PRIVATE_VAPID_KEY
+VAPID_SUBJECT=mailto:your-email@example.com
+```
+
+3. Install the web-push package:
+
+```bash
+npm install web-push
+```
+
+4. Uncomment the implementation in `src/app/api/send-notification/route.ts` to enable sending notifications from your server.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

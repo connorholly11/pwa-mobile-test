@@ -30,5 +30,7 @@
       "sizes": "180x180",
       "type": "image/svg+xml"
     }
-  ]
+  ],
+  "gcm_sender_id": "YOUR_SENDER_ID",
+  "permissions": ["notifications"]
 } 

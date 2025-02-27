@@ -1,5 +1,7 @@
 'use client';
 
+import NotificationButton from './NotificationButton';
+
 export default function DiscoverInterface() {
   return (
     <div className="discover-interface">
@@ -8,6 +10,16 @@ export default function DiscoverInterface() {
       </div>
       
       <div className="discover-content">
+        <div className="section-title">
+          <h3>Notifications</h3>
+          <p className="section-description">Control how you receive alerts and updates</p>
+          <NotificationButton className="mt-3" />
+        </div>
+        
+        <div className="section-title mt-8">
+          <h3>Features</h3>
+        </div>
+        
         <div className="card">
           <div className="card-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#4f46e5" width="24" height="24">

@@ -3,9 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useChat } from '../contexts/ChatContext';
 import { 
-  SpeechRecognitionWithAlternatives,
-  SpeechRecognitionEvent,
-  SpeechRecognitionErrorEvent
+  SpeechRecognitionWithAlternatives
 } from '../types/speech-recognition';
 
 // Use the extended type with maxAlternatives property
@@ -157,7 +155,8 @@ export default function ChatInput() {
         clearTimeout(errorTimeoutRef.current);
       }
     };
-  }, [addMessage, failedAttempts, maxRetries]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addMessage, failedAttempts, maxRetries]); // intentionally omitting recognition to avoid re-initialization
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

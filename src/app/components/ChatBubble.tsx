@@ -10,7 +10,7 @@ interface ChatBubbleProps {
 }
 
 export default function ChatBubble({ message }: ChatBubbleProps) {
-  const { showReasoning, generateAudioForMessage } = useChat();
+  const { showReasoning, generateAudioForMessage, aiPersonality } = useChat();
   const [expanded, setExpanded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -58,15 +58,26 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
   }
   
   // Determine bubble class based on message type
-  const bubbleClass = message.isError 
-    ? 'error-bubble' 
-    : message.sender === 'user' 
-      ? 'user-bubble' 
-      : 'ai-bubble';
+  let bubbleClass = '';
+  let contentClass = '';
+  
+  if (message.sender === 'user') {
+    bubbleClass = 'user';
+    contentClass = '';
+  } else if (message.isError) {
+    bubbleClass = 'ai';
+    contentClass = 'error';
+  } else if (message.isNotification) {
+    bubbleClass = 'ai';
+    contentClass = 'notification';
+  } else {
+    bubbleClass = `ai ${aiPersonality}`;
+    contentClass = '';
+  }
   
   return (
     <div className={`chat-bubble ${bubbleClass}`}>
-      <div className="bubble-content">
+      <div className={`chat-content ${contentClass}`}>
         {message.isError && (
           <div className="error-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
@@ -76,7 +87,7 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
         )}
         <p>{message.text}</p>
         
-        {message.sender === 'ai' && !message.isError && (
+        {message.sender === 'ai' && !message.isError && !message.isNotification && (
           <div className="message-actions">
             {/* Speak button */}
             <button 
@@ -133,9 +144,9 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
           </div>
         )}
       </div>
-      <div className="bubble-timestamp">
+      <div className="timestamp">
         {formatTimeAgo(new Date(message.timestamp))}
       </div>
     </div>
   );
-} 
+}

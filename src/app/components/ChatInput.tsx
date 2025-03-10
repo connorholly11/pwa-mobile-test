@@ -94,17 +94,25 @@ export default function ChatInput() {
           // Show appropriate error message based on the error type
           if (event.error === 'network') {
             if (failedAttempts >= maxRetries) {
-              setErrorMessage('Speech recognition unavailable. Please type your message instead or try again later.');
+              setErrorMessage('Speech recognition unavailable due to network issues. Please check your internet connection or try typing your message instead.');
             } else {
               setErrorMessage(`Network issue with speech recognition. Retry ${failedAttempts + 1}/${maxRetries + 1}`);
               
-              // Auto-retry after a delay
+              // Auto-retry after a delay with exponential backoff
+              const backoffTime = Math.min(1500 * Math.pow(2, failedAttempts), 8000);
               setTimeout(() => {
                 if (isMountedRef.current && recognition) {
+                  console.log(`🎙️ Auto-retrying speech recognition (attempt ${failedAttempts + 1})`);
                   setIsListening(true);
-                  recognition.start();
+                  try {
+                    recognition.start();
+                  } catch (err) {
+                    console.error('Failed to restart speech recognition:', err);
+                    setIsListening(false);
+                    setErrorMessage('Unable to restart speech recognition. Please try again later.');
+                  }
                 }
-              }, 1500);
+              }, backoffTime);
             }
           } else if (event.error === 'not-allowed' || event.error === 'permission-denied') {
             setErrorMessage('Microphone access denied. Please allow microphone permission in your browser settings.');

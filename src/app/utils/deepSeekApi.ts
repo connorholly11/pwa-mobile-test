@@ -31,9 +31,12 @@ export function getCurrentModel(): string {
   return MODELS[currentModelIndex];
 }
 
+// Properly type the DeepSeek API message roles
+export type DeepSeekRole = 'system' | 'user' | 'assistant';
+
 // Define and export message interface for API
 export interface DeepSeekMessage {
-  role: string;
+  role: DeepSeekRole;
   content: string;
 }
 

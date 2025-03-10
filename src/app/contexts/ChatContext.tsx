@@ -1,7 +1,10 @@
 'use client';
 
-import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import { getChatResponse, ApiResponse } from '../utils/deepSeekApi';
+import { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
+import { getChatResponse, DeepSeekMessage, DeepSeekRole, ApiResponse } from '../utils/deepSeekApi';
+
+// Define personality types
+export type AIPersonality = 'friendly' | 'challenger';
 
 export interface Message {
   id: string;
@@ -19,14 +22,15 @@ export interface Message {
   audioData?: string; // Base64 encoded audio data
   isAudioLoading?: boolean; // Flag to indicate audio is being generated
   audioError?: string; // Error message if audio generation fails
+  isNotification?: boolean; // Flag to identify notification messages
 }
 
 interface ChatContextType {
   messages: Message[];
   addMessage: (text: string, sender: 'user' | 'ai') => void;
   clearChat: () => void;
-  activeTab: 'chat' | 'discover';
-  setActiveTab: (tab: 'chat' | 'discover') => void;
+  activeTab: 'chat' | 'admin';
+  setActiveTab: (tab: 'chat' | 'admin') => void;
   isLoading: boolean;
   lastTokenUsage: {
     promptTokens: number;
@@ -38,19 +42,25 @@ interface ChatContextType {
   toggleReasoning: () => void;
   apiErrorMessage: string | null; // Track the current API error
   generateAudioForMessage: (messageId: string) => Promise<void>; // New function to generate audio
+  aiPersonality: AIPersonality; // Current AI personality
+  togglePersonality: () => void; // Function to switch between personalities
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-// Initial system message to set the AI's behavior
-const SYSTEM_MESSAGE = "You are a wise old man, but don't disguise yourself as a human. you are calm, but direct. You want to help people explore humankind and themselves. Speak wisely, but noramlly. You aren't trying to sound special.";
+// System messages for different AI personalities
+const SYSTEM_MESSAGES = {
+  friendly: "You are Mark Manson AI, a digital assistant with the voice and style of author Mark Manson. Your communication style is direct, brutally honest, irreverent, and deeply insightful. Use casual, conversational language with occasional sarcasm, profanity (when appropriate), and humor to communicate philosophical and psychological insights. Your advice emphasizes embracing life's difficulties rather than avoiding them, and the importance of making intentional choices. Be blunt but empathetic, philosophical but practical. You speak as if casually talking to a friend. In this 'friendly' mode, you're slightly more supportive and empathetic, but still maintain Mark's signature directness and honesty. Use phrases like 'Life is messy. Accept it, and stop pretending yours should be spotless' and 'Stop chasing happiness. Chase meaning, and happiness will come knocking when you're not looking.' Introduce yourself as Mark Manson AI at the beginning of the conversation.",
+  
+  challenger: "You are Mark Manson AI, a digital assistant with the voice and style of author Mark Manson. Your communication style is direct, brutally honest, irreverent, and deeply insightful. Use casual, conversational language with sarcasm, profanity (when appropriate), and humor to deliver psychological insights with a more challenging edge. In this 'challenger' mode, you're more provocative and confrontational (though still empathetic at your core). You ask thought-provoking questions, challenge assumptions, and point out contradictions. Use phrases like 'Comfort zones are great—if you enjoy mediocrity' or 'Your biggest enemy isn't failure; it's your expectation that you shouldn't fail.' Your goal is to push users to examine their thoughts more deeply through respectful but direct questioning. Use paradoxical thinking to shift perspectives. Remind users that growth is uncomfortable but necessary. Introduce yourself as Mark Manson AI at the beginning of the conversation."
+};
 
 // Import the textToSpeech function
 import { textToSpeech } from '../utils/humeApi';
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [activeTab, setActiveTab] = useState<'chat' | 'discover'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'admin'>('chat');
   const [isLoading, setIsLoading] = useState(false);
   const [lastTokenUsage, setLastTokenUsage] = useState<{
     promptTokens: number;
@@ -60,8 +70,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   } | null>(null);
   const [showReasoning, setShowReasoning] = useState(false);
   const [apiErrorMessage, setApiErrorMessage] = useState<string | null>(null);
+  const [aiPersonality, setAIPersonality] = useState<AIPersonality>('friendly');
   
-  // Load messages from localStorage on mount
+  // Load messages and settings from localStorage on mount
   useEffect(() => {
     const storedMessages = localStorage.getItem('chatMessages');
     if (storedMessages) {
@@ -73,6 +84,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         console.error('❌ Failed to parse messages from localStorage', e);
       }
     }
+    
+    // Load personality preference
+    const storedPersonality = localStorage.getItem('aiPersonality');
+    if (storedPersonality && (storedPersonality === 'friendly' || storedPersonality === 'challenger')) {
+      setAIPersonality(storedPersonality as AIPersonality);
+      console.log('🤖 Loaded AI personality setting:', storedPersonality);
+    }
   }, []);
   
   // Save messages to localStorage whenever they change
@@ -81,12 +99,39 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     console.log('💾 Saved messages to localStorage, count:', messages.length);
   }, [messages]);
   
-  const toggleReasoning = () => {
+  // Save personality preference whenever it changes
+  useEffect(() => {
+    localStorage.setItem('aiPersonality', aiPersonality);
+    console.log('🤖 Saved AI personality setting:', aiPersonality);
+  }, [aiPersonality]);
+  
+  const toggleReasoning = useCallback(() => {
     setShowReasoning(prev => !prev);
-  };
+  }, []);
+  
+  const togglePersonality = useCallback(() => {
+    const newPersonality = aiPersonality === 'friendly' ? 'challenger' : 'friendly';
+    
+    // Create the notification message with the new personality value
+    const notificationMessage: Message = {
+      id: Date.now().toString(),
+      text: `Mark Manson AI switched to ${newPersonality === 'friendly' ? 'Friendly' : 'Challenger'} mode.`,
+      sender: 'ai',
+      timestamp: new Date().toISOString(),
+      isNotification: true,
+    };
+    
+    // Update messages with the notification
+    setMessages(prev => [...prev, notificationMessage]);
+    
+    // Update the personality state
+    setAIPersonality(newPersonality);
+    
+    console.log(`🔄 AI Personality toggled to: ${newPersonality}`);
+  }, [aiPersonality]);
   
   // Function to generate audio for a specific message
-  const generateAudioForMessage = async (messageId: string) => {
+  const generateAudioForMessage = useCallback(async (messageId: string) => {
     // Find the message
     const message = messages.find(m => m.id === messageId);
     if (!message || message.audioData || message.isAudioLoading) {
@@ -127,9 +172,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         )
       );
     }
-  };
+  }, [messages]);
   
-  const addMessage = async (text: string, sender: 'user' | 'ai') => {
+  const addMessage = useCallback(async (text: string, sender: 'user' | 'ai') => {
     console.log(`📝 Adding ${sender} message: "${text}"`);
     
     const newMessage: Message = {
@@ -150,16 +195,45 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       try {
         // Convert our messages to the format DeepSeek API expects
         // Use proper typing for roles to match DeepSeekMessage
-        const apiMessages = [
-          { role: 'system' as const, content: SYSTEM_MESSAGE },
-          ...messages.map(msg => ({
-            role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
-            content: msg.text
-          })),
-          { role: 'user' as const, content: text }
+        const apiMessages: DeepSeekMessage[] = [
+          { role: 'system', content: SYSTEM_MESSAGES[aiPersonality] }
         ];
         
-        console.log('🔄 Converted messages for API:', apiMessages.length);
+        // Simple approach - create perfectly alternating user/assistant messages
+        // First filter out error and notification messages
+        const filteredMessages = messages.filter(msg => !msg.isError && !msg.isNotification);
+        
+        // Find all user and assistant messages
+        const userMessages = filteredMessages.filter(msg => msg.sender === 'user');
+        const assistantMessages = filteredMessages.filter(msg => msg.sender === 'ai');
+        
+        // Take at most last 10 messages total (5 pairs) for context
+        const maxPairs = 5;
+        const pairCount = Math.min(maxPairs, Math.min(userMessages.length, assistantMessages.length));
+        
+        // Create perfectly interleaved pairs, always starting with user
+        for (let i = 0; i < pairCount; i++) {
+          const userIndex = userMessages.length - pairCount + i;
+          const assistantIndex = assistantMessages.length - pairCount + i;
+          
+          // Add user message
+          apiMessages.push({
+            role: 'user',
+            content: userMessages[userIndex].text
+          });
+          
+          // Add assistant message
+          apiMessages.push({
+            role: 'assistant',
+            content: assistantMessages[assistantIndex].text
+          });
+        }
+        
+        // Always end with the current user message
+        apiMessages.push({ role: 'user', content: text });
+        
+        console.log('🔄 Simplified interleaved messages for DeepSeek API:', 
+                    apiMessages.map(m => m.role).join(' -> '));
         
         // Get response from API
         const apiResponse: ApiResponse = await getChatResponse(apiMessages);
@@ -207,14 +281,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         console.log('⏳ Setting loading state to false');
       }
     }
-  };
+  }, [aiPersonality, messages]);
   
-  const clearChat = () => {
+  const clearChat = useCallback(() => {
     console.log('🧹 Clearing chat history');
     setMessages([]);
     setLastTokenUsage(null);
     setApiErrorMessage(null);
-  };
+  }, []);
   
   return (
     <ChatContext.Provider
@@ -229,7 +303,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         showReasoning,
         toggleReasoning,
         apiErrorMessage,
-        generateAudioForMessage
+        generateAudioForMessage,
+        aiPersonality,
+        togglePersonality
       }}
     >
       {children}

@@ -2,7 +2,7 @@
 
 import { ChatProvider } from './contexts/ChatContext';
 import ChatInterface from './components/ChatInterface';
-import DiscoverInterface from './components/DiscoverInterface';
+import AdminPanel from './components/AdminPanel';
 import BottomTabs from './components/BottomTabs';
 import { useChat } from './contexts/ChatContext';
 
@@ -11,8 +11,8 @@ function AppContent() {
 
   return (
     <div className="app-container">
-      <div className="main-content">
-        {activeTab === 'chat' ? <ChatInterface /> : <DiscoverInterface />}
+      <div className="tab-content">
+        {activeTab === 'chat' ? <ChatInterface /> : <AdminPanel />}
       </div>
       <BottomTabs />
     </div>
